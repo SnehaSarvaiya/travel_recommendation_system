@@ -1,21 +1,59 @@
+from click import prompt
 from flask import Flask, render_template,request
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 import numpy as np
+from itinerary import generate_itinerary
+from pathlib import Path
+from flask import session
+# import http.client
 
 # app
 app = Flask(__name__)
+app.secret_key = "travel_ai_secret"
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+# Debug prints (can remove later)
+print("BASE_DIR:", BASE_DIR)
+print("DATA_DIR:", DATA_DIR)
+print("DATA_DIR exists:", DATA_DIR.exists())
+print("FILES:", list(DATA_DIR.glob("*")))
+# model_path = DATA_DIR/ "model.pkl"
+# label_encoders_path = DATA_DIR / "label_encoders.pkl"
+# destinations_path = DATA_DIR / "Expanded_Destinations.csv"
+# userhistory_path = DATA_DIR / "Final_Updated_Expanded_UserHistory.csv"
+# df_path = DATA_DIR / "final_df.csv"
+# print("BASE_DIR:", BASE_DIR)
+# print("DATA_DIR:", DATA_DIR)
+# print("DATA FILES:", list(DATA_DIR.glob("*")))
+# File paths
+# -----------------------------
+model_path = DATA_DIR / "model.pkl"
+label_encoders_path = DATA_DIR / "label_encoders.pkl"
+destinations_path = DATA_DIR / "Expanded_Destinations.csv"
+userhistory_path = DATA_DIR / "Final_Updated_Expanded_UserHistory.csv"
+df_path = DATA_DIR / "final_df.csv"
+
+
+# sanity checks
+for p in (model_path, label_encoders_path, destinations_path, userhistory_path, df_path):
+    if not p.exists():
+        raise FileNotFoundError(f"Required file not found: {p}")
 
 # Load datasets and models
 features = ['Name_x', 'State', 'Type', 'BestTimeToVisit', 'Preferences', 'Gender', 'NumberOfAdults', 'NumberOfChildren']
-model = pickle.load(open('code and dataset/model.pkl','rb'))
-label_encoders = pickle.load(open('code and dataset/label_encoders.pkl','rb'))
+# model = pickle.load(open(DATA_DIR / "model.pkl",'rb'))
+# label_encoders = pickle.load(open(DATA_DIR / "label_encoders.pkl",'rb'))
 
-destinations_df = pd.read_csv("code and dataset/Expanded_Destinations.csv")
-userhistory_df = pd.read_csv("code and dataset/Final_Updated_Expanded_UserHistory.csv")
-df = pd.read_csv("code and dataset/final_df.csv")
-
+# destinations_df = pd.read_csv(DATA_DIR / "Expanded_Destinations.csv")
+# userhistory_df = pd.read_csv(DATA_DIR / "Final_Updated_Expanded_UserHistory.csv")
+# df = pd.read_csv(DATA_DIR / "final_df.csv")
+model = pickle.load(open(model_path, "rb"))
+label_encoders = pickle.load(open(label_encoders_path, "rb"))
+destinations_df = pd.read_csv(destinations_path)
+userhistory_df = pd.read_csv(userhistory_path)
+df = pd.read_csv(df_path)
 
 # Collaborative Filtering Function
 # Create a user-item matrix based on user history
@@ -88,14 +126,65 @@ def index():
 @app.route('/recommendation')
 def recommendation():
     return render_template('recommendation.html')
+@app.route('/search')
+def search():
+    return render_template('search.html')
+@app.route('/itinerary', methods=["GET","POST"])
+def itinerary():
 
+    bot_reply = None
+    user_message = None
+
+    if request.method == "POST":
+
+        user_message = request.form.get("message", "")
+        places = request.form.getlist("selected_places") 
+        places = list(dict.fromkeys(places))
+        if not places:
+            places = session.get('recommended_places', [])
+        days = request.form.get("days")
+        budget = request.form.get("budget")
+        transport = request.form.get("transport")
+        food = request.form.get("food", "Veg")
+        interests = request.form.get("interests")
+        print("Selected places from form:", places)
+
+        # # Example recommended places
+        # recommended_places = session.get('recommended_places', []) 
+        bot_reply = generate_itinerary(
+        user_message=user_message,
+        recommended_places=places,   
+        days=days,
+        budget=budget,
+        transport=transport,
+        food=food,
+        interests=interests
+)
+        
+        return render_template(
+        "itinerary.html",
+        user_message=user_message,
+        bot_reply=bot_reply,
+        recommended_places=session.get('recommended_places', [])
+    )
+# @app.route("/itinerary", methods=["POST"])
+# def generate_plan():
+
+#     recommended_places = session.get("recommended_places", [])
+
+#     itinerary = generate_itinerary(prompt, recommended_places)
+
+#     return render_template(
+#         "itinerary.html",
+#         bot_reply=itinerary,
+#         recommended_places=recommended_places   # ✅ IMPORTANT
+#     )
 # Route for the recommendation
 @app.route("/recommend", methods=['GET', 'POST'])
 def recommend():
     if request.method == "POST":
-        user_id = request.form['user_id']
-        user_id = int(user_id)
-        # Capture form data
+        user_id = int(request.form['user_id'])
+
         user_input = {
             'Name_x': request.form['name'],
             'Type': request.form['type'],
@@ -107,18 +196,32 @@ def recommend():
             'NumberOfChildren': request.form['children'],
         }
 
-        # Collaborative filtering function
-        recommended_destinations = collaborative_recommend(user_id, user_similarity,
-                                                           user_item_matrix, destinations_df)
+        # Collaborative filtering recommendation
+        recommended_destinations = collaborative_recommend(
+            user_id, user_similarity, user_item_matrix, destinations_df
+        )
 
-        # Prediction function for popularity (if applicable)
-        predicted_popularity = recommend_destinations(user_input, model, label_encoders, features, df)
+        # Popularity prediction
+        predicted_popularity = recommend_destinations(
+            user_input, model, label_encoders, features, df
+        )
 
-        # Render the recommendation page with recommendations
-        return render_template('recommendation.html', recommended_destinations=recommended_destinations,
-                               predicted_popularity=predicted_popularity)
-    return render_template('recommendation.html')
+        # Extract POI names
+        poi_list = recommended_destinations['Name'].tolist()
+        session['recommended_places'] = poi_list
+        # Generate AI itinerary
+        # itinerary = generate_itinerary(user_message="", recommended_places=poi_list)
 
+        return render_template(
+            
+    "recommendation.html",
+    recommended_destinations=recommended_destinations,
+    predicted_popularity=predicted_popularity,
+    itinerary=itinerary,
+    recommended_places=poi_list   # ✅ ADD THIS LINE
+)
+        print("POI LIST:", poi_list)
+        return render_template('recommendation.html')
 
 if __name__ == '__main__':
     # Run the app in debug mode

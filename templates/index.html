@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <title>AI Travel Planner</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .hero {
+            height: 80vh;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+        }
+
+        .hero-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 30px;
+            border-radius: 10px;
+        }
+
+        .destination-card img {
+            height: 250px;
+            object-fit: cover;
+        }
+
+        #map {
+            width: 100%;
+            height: 450px;
+            margin-top: 20px;
+        }
+
+        footer {
+            background: #222;
+            color: white;
+            padding: 30px;
+            margin-top: 50px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+
+        <div class="container">
+
+            <a class="navbar-brand" href="/">AI Travel Planner</a>
+
+            <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navMenu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navMenu">
+
+                <ul class="navbar-nav ms-auto">
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="/recommendation">Get Recommendation</a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="/itinerary">Generate Tour Plan</a>
+                    </li>
+
+                    <!-- <li class="nav-item">
+                        <a class="nav-link" href="/search">Search Places</a>
+                    </li> -->
+                    <!-- Search Box -->
+
+                </ul>
+                <form class="d-flex" onsubmit="searchPlace(event)">
+
+                    <input class="form-control me-2" id="placeInput" type="search" placeholder="Search places">
+
+                    <button class="btn btn-success" type="submit">Search</button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+    <!-- HERO SECTION -->
+
+    <section class="hero" id="heroSection">
+
+        <div class="hero-overlay">
+
+            <h1>Explore The World With AI</h1>
+
+            <p>Smart Travel Recommendation & AI Itinerary Planner</p>
+
+            <a href="/recommendation" class="btn btn-warning btn-lg mt-3">
+                Start Planning
+            </a>
+
+        </div>
+
+    </section>
+
+    <!-- DESTINATIONS -->
+
+    <section class="container mt-5">
+
+        <h2 class="text-center mb-4">Popular Destinations</h2>
+
+        <div class="row">
+
+            <div class="col-md-4">
+
+                <div class="card destination-card">
+
+                    <img id="tajImg">
+
+                    <div class="card-body">
+
+                        <h5 class="card-title">Taj Mahal</h5>
+
+                        <p class="card-text">
+                            One of the most famous monuments in India located in Agra.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <div class="card destination-card">
+
+                    <img id="goaImg">
+
+                    <div class="card-body">
+
+                        <h5 class="card-title">Goa</h5>
+
+                        <p class="card-text">
+                            Known for beaches, nightlife and Portuguese architecture.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <div class="card destination-card">
+
+                    <img id="keralaImg">
+
+                    <div class="card-body">
+
+                        <h5 class="card-title">Kerala</h5>
+
+                        <p class="card-text">
+                            Famous for backwaters, houseboats and lush greenery.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+    <!-- Map Section -->
+
+    <div class="container mt-4">
+
+        <h3>Location Map</h3>
+
+        <div id="map"></div>
+
+    </div>
+
+    <script>
+
+        mapboxgl.accessToken = "YOUR_MAPBOX_ACCESS_TOKEN";
+
+        const map = new mapboxgl.Map({
+            container: "map",
+            style: "mapbox://styles/mapbox/streets-v11",
+            center: [78.9629, 20.5937],
+            zoom: 4
+        });
+
+        let marker;
+
+        async function searchPlace(event) {
+
+            event.preventDefault();
+
+            let place = document.getElementById("placeInput").value;
+
+            let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${place}.json?access_token=${mapboxgl.accessToken}`;
+
+            let response = await fetch(url);
+
+            let data = await response.json();
+
+            // let coordinates = data.features[0].center;
+            if (data.features.length > 0) {
+                let coordinates = data.features[0].center;
+
+                map.flyTo({
+                    center: coordinates,
+                    zoom: 10
+                });
+
+                if (marker) {
+                    marker.remove();
+                }
+
+                marker = new mapboxgl.Marker()
+                    .setLngLat(coordinates)
+                    .addTo(map);
+            }
+            else {
+                alert("Place not found");
+            }
+
+            map.flyTo({
+                center: coordinates,
+                zoom: 10
+            });
+
+            if (marker) {
+                marker.remove();
+            }
+
+            marker = new mapboxgl.Marker()
+                .setLngLat(coordinates)
+                .addTo(map);
+
+        }
+
+    </script>
+
+    <!-- FEATURES -->
+
+    <section class="container mt-5">
+
+        <h2 class="text-center mb-4">System Features</h2>
+
+        <div class="row text-center">
+
+            <div class="col-md-4">
+                <h4>Destination Recommendation</h4>
+                <p>Machine learning suggests travel destinations based on user preferences.</p>
+            </div>
+
+            <div class="col-md-4">
+                <h4>AI Tour Planner</h4>
+                <p>Generate day-wise travel itinerary automatically using AI.</p>
+            </div>
+
+            <div class="col-md-4">
+                <h4>Search Places</h4>
+                <p>Find locations and explore them on interactive maps.</p>
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- FOOTER -->
+
+    <footer class="text-center">
+
+        <h4>Contact Us</h4>
+
+        <p>Email: travelplanner@gmail.com</p>
+        <p>Phone: +91 9876543210</p>
+
+        <p>© 2026 AI Travel Planner</p>
+
+    </footer>
+
+    <script>
+
+        const UNSPLASH_KEY = "YOUR_UNSPLASH_ACCESS_KEY";
+
+        async function loadImages() {
+
+            // HERO IMAGE
+
+            let hero = await fetch(`https://api.unsplash.com/photos/random?query=travel landscape&client_id=${UNSPLASH_KEY}`);
+            let heroData = await hero.json();
+
+            document.getElementById("heroSection").style.backgroundImage =
+                `url(${heroData.urls.regular})`;
+
+
+            // TAJ MAHAL
+
+            let taj = await fetch(`https://api.unsplash.com/photos/random?query=taj mahal india&client_id=${UNSPLASH_KEY}`);
+            let tajData = await taj.json();
+
+            document.getElementById("tajImg").src = tajData.urls.small;
+
+
+            // GOA
+
+            let goa = await fetch(`https://api.unsplash.com/photos/random?query=goa beach&client_id=${UNSPLASH_KEY}`);
+            let goaData = await goa.json();
+
+            document.getElementById("goaImg").src = goaData.urls.small;
+
+
+            // KERALA
+
+            let kerala = await fetch(`https://api.unsplash.com/photos/random?query=kerala backwaters&client_id=${UNSPLASH_KEY}`);
+            let keralaData = await kerala.json();
+
+            document.getElementById("keralaImg").src = keralaData.urls.small;
+
+        }
+
+        loadImages();
+
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>
